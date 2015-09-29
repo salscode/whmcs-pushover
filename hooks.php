@@ -36,7 +36,9 @@ function whmcspushover_sendPushSingle($message, $userAccessToken)
 {
 	whmcspushover_prepMessage($message);
 	$message['user'] = $userAccessToken;
-	curlCall("https://api.pushover.net/1/messages.json", $message);
+	
+	$options = array('CURLOPT_SAFE_UPLOAD' => true);
+	curlCall("https://api.pushover.net/1/messages.json", $message, $options);
 }
 
 // Pushes a message to all the admins that have the specificed notification set.
@@ -48,7 +50,9 @@ function whmcspushover_sendPushAll($message, $permission)
 	while($usr = mysql_fetch_array( $administrators, MYSQL_ASSOC ))
 	{
 		$message['user'] = $usr['access_token'];
-		curlCall("https://api.pushover.net/1/messages.json", $message);
+		
+		$options = array('CURLOPT_SAFE_UPLOAD' => true);
+		curlCall("https://api.pushover.net/1/messages.json", $message, $options);
 	}
 }
 
@@ -62,6 +66,18 @@ function hook_whmcspushover_ClientAdd($vars) {
 	);
 	
 	whmcspushover_sendPushAll($message, 'new_client');
+}
+
+function hook_whmcspushover_AfterFraud($vars) {
+	$message = array(
+		'priority' => ($vars['isfraud'] ? 2 : 0),
+		'title' => "Order Fraud Results",
+		'message' => "A new order for {$vars['amount']} has been fraud checked. {$vars['clientdetails']['firstname']} {$vars['clientdetails']['lastname']} ({$vars['clientdetails']['companyname']})",
+		'url' => "/clientssummary.php?userid={$vars['clientdetails']['userid']}",
+		'url_title' => "View Client #{$vars['clientdetails']['userid']}",
+	);
+	
+	whmcspushover_sendPushAll($message, 'fraud_check');
 }
 
 function hook_whmcspushover_InvoicePaid($vars) {
@@ -140,6 +156,7 @@ function widget_whmcspushover($vars) {
 }
 
 add_hook("ClientAdd",10,"hook_whmcspushover_ClientAdd");
+add_hook("AfterFraudCheck",10,"hook_whmcspushover_AfterFraud");
 add_hook("InvoicePaid",10,"hook_whmcspushover_InvoicePaid");
 add_hook("TicketOpen",10,"hook_whmcspushover_TicketOpen");
 add_hook("TicketUserReply",10,"hook_whmcspushover_TicketUserReply");
